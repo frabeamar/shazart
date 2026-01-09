@@ -1,0 +1,15 @@
+[project]
+name = "rijks-downloader"
+version = "0.1.0"
+description = "A script to download metadata and images from the Rijksmuseum API"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+    "numpy",
+    "streamlit",
+    "cohere",
+    "google-genai",
+    "python-dotenv",
+    "pymilvus[milvus_lite]"
+]
