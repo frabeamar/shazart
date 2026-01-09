@@ -19,6 +19,11 @@ load_dotenv(".env")
 st.set_page_config(layout="wide", page_title="Shazart: Vision RAG at the Rijksmuseum")
 st.title("Shazart: Vision RAG at the Rijksmuseum 🖼️")
 
+intro = """
+Ever stared at a masterpiece in a museum and thought, "It’s pretty, but I can't bother to read the tedious description?" Shazart is the Shazam for the art world—with a personality. Search by title or by an image, and we’ll skip the dry, crusty textbook jargon. Instead, you get a punchy, fun retelling of the scandals, the secrets, and the "what was the artist thinking?" behind the canvas.
+Ask question about the collection. The RAG augmented system will be able to answer your questions!
+"""
+st.text(intro)
 # --- API Key Input ---
 with st.sidebar:
     st.header("🔑 API Keys")
@@ -101,7 +106,7 @@ def download_and_embed_sample_images(
 ) -> tuple[list[str], np.ndarray | None]:
     """Downloads sample images and computes their embeddings using Cohere's Embed-4 model."""
 
-    img_folder = Path.home() / "data" / "painting"
+    img_folder = "./paiting/"
     images = list(Path(img_folder).glob("*.jpg"))
     # Prepare folders
     os.makedirs(img_folder, exist_ok=True)
@@ -129,7 +134,6 @@ def download_and_embed_sample_images(
             except Exception as e:
                 st.error(f"Failed to embed {img_path}: {e}")
                 # Add placeholder on error
-
     # Filter out None embeddings and corresponding paths before stacking
     filtered_paths = [
         str(path)
@@ -293,6 +297,7 @@ if cohere_api_key and co:
                 st.info("Sample images already loaded.")
                 
         else:
+            breakpoint()
             st.error("Failed to load sample images. Check console for errors.")
 else:
     st.warning("Enter API keys to enable loading sample images.")
@@ -301,7 +306,7 @@ st.markdown("--- ")
 # --- File Uploader (Main UI) ---
 st.subheader("📤 Upload Your Images")
 st.info(
-    "Or, upload your own images or PDFs. The RAG process will search across all loaded content."
+    "Or, upload your own images. The RAG process will search across all loaded content."
 )
 
 # File uploader
@@ -392,7 +397,7 @@ if not st.session_state.image_paths:
     st.warning("Please load sample images or upload your own images first.")
 else:
     st.info(
-        f"Ready to answer questions about {len(st.session_state.image_paths)} images."
+        f"Ready to answer questions about {len(st.session_state.image_paths)} images. The rijkmuseum collection is also included!"
     )
 
                     
