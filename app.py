@@ -27,12 +27,11 @@ st.text(intro)
 # --- API Key Input ---
 with st.sidebar:
     st.header("🔑 API Keys")
-    # cohere_api_key = st.text_input("Cohere API Key", type="password", key="cohere_key")
-    # google_api_key = st.text_input(
-    #     "Google API Key (Gemini)", type="password", key="google_key"
-    # )
-    cohere_api_key = os.getenv("COHERE_API_KEY", "")
-    google_api_key = os.getenv("GOOGLE_API_KEY", "")
+    cohere_api_key = st.text_input("Cohere API Key", type="password", key="cohere_key")
+    google_api_key = st.text_input(
+        "Google API Key (Gemini)", type="password", key="google_key"
+    )
+
 
     "[Get a Cohere API key](https://dashboard.cohere.com/api-keys)"
     "[Get a Google API key](https://aistudio.google.com/app/apikey)"
@@ -207,8 +206,8 @@ def search(
 
 
 def validate(img_path: str, gemini_client) -> list:
+    missing = []
     if not gemini_client or not img_path or not os.path.exists(img_path):
-        missing = []
         if not gemini_client:
             missing.append("Gemini client")
         if not img_path:
@@ -254,7 +253,12 @@ def funny_summary(img_path: str, gemini_client):
         return f"Answering prerequisites not met ({', '.join(missing)} missing or invalid)."
 
     prompt = """Provide a funny and engaging summary of the content in the following image.
-    Provide a short and witty description of the life events of the author that are relevant to understand the image"""
+    Provide a short and witty description of the life events of the author that are relevant to understand the image. 
+    Format in the following structure:
+    <Painting title> - <Artist>
+    [Painting description]
+    [Artist llife events which are relevant to the painting ]
+    """
     return call_with_prompt(prompt, img_path, gemini_client)
 
 
@@ -292,12 +296,15 @@ if cohere_api_key and co:
                     )
                 st.success(f"Loaded {len(new_paths)} sample images.")
 
+                with st.spinner("Generating caption..."):
+                    for image in new_paths:
+                        caption_text = funny_summary(image, genai_client)
+                        st.markdown(f"**The better museum caption:**\n{caption_text}")
     
             else:
                 st.info("Sample images already loaded.")
                 
         else:
-            breakpoint()
             st.error("Failed to load sample images. Check console for errors.")
 else:
     st.warning("Enter API keys to enable loading sample images.")
@@ -475,14 +482,7 @@ if run_button:
 
                 if top_image_path:
                     caption = f"Retrieved content for: '{question}' (Source: {os.path.basename(top_image_path)})"
-                    # Add source PDF name if it's a page image
-                    if top_image_path.startswith("pdf_pages/"):
-                        parts = top_image_path.split(os.sep)
-                        if len(parts) >= 3:
-                            pdf_name = parts[1]
-                            page_name = parts[-1]
-                            caption = f"Retrieved content for: '{question}' (Source: {pdf_name}.pdf, {page_name.replace('.png', '')})"
-
+ 
                     retrieved_image_placeholder.image(
                         top_image_path, caption=caption, use_container_width=True
                     )
