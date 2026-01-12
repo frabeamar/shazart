@@ -11,25 +11,12 @@ import cv2
 def run_yolo():
     # 1. Load the latest lightweight OBB model
     # 'yolo11n-obb.pt' is extremely fast and perfect for mobile/edge use
-    model = YOLO('yolo11n-obb.pt')
+    model = YOLO("runs/obb/train/weights/best.pt")
 
-    # 2. Run inference on your image
-    # We set a confidence threshold (0.5) to filter out weak detections
-    results = model('earring.jpg', conf=0.5)
-    # 3. Process the results
-    for result in results:
-        breakpoint()
-        if result.obb:
-            # Get corner coordinates in [x1, y1, x2, y2, x3, y3, x4, y4] format
-            # This is exactly what you need for the Kornia-rs homography!
-            corners = result.obb.xyxyxyxy[0].cpu().numpy()
-            
-            print("Detected Painting Corners:")
-            print(corners)
 
-            # Optional: Save or show the result with the tilted boxes drawn
-            result.show() 
-            result.save(filename='./detected_painting.jpg')
+    results = model.predict(source="earring.jpg", save=True, conf=0.3)
+    idx = np.argmax([r.obb.conf.cpu().numpy() for r in results]).item()
+    return results[idx].obb.xyxy
 
 
 
@@ -105,11 +92,7 @@ def are_duplicates(hash1, hash2, threshold=5):
     # distance 0 = exact match
     # distance < 5-10 = very likely a duplicate/resized version
     return distance <= threshold
-import numpy as np
-import cv2
 
-# Pre-initialize the hasher once
-PHASHER = cv2.img_hash.PHash_create()
 
 def compare_vectorized(query_hash, database_hashes, threshold=5):
     """
@@ -133,7 +116,6 @@ def find_duplicates():
     hashes = [get_image_hash(m) for m in images]
     matches = compare_vectorized(hashes, hashes)
     print(matches)
-    breakpoint()
 
 
 
