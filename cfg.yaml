@@ -1,0 +1,33 @@
+# 1. Dataset Paths
+path: . 
+train: images/train
+val: images/val
+
+names:
+  0: painting
+# 3. Image Settings
+imgsz: 640  # Training image size
+
+# 4. Hyperparameters (Augmentation)
+# These will be applied to your synthetic images on-the-fly
+hyp:
+  lr0: 0.01             # Initial learning rate
+  lrf: 0.01             # Final learning rate
+  momentum: 0.937       # SGD momentum
+  weight_decay: 0.0005  # Optimizer weight decay
+  
+  # Color Augmentations (Essential for varied museum lighting)
+  hsv_h: 0.015  # Image HSV-Hue augmentation
+  hsv_s: 0.7    # Image HSV-Saturation augmentation
+  hsv_v: 0.4    # Image HSV-Value augmentation
+  
+  # Geometric Augmentations (Additional to your Homography)
+  degrees: 0.0     # Already handled by your generator
+  translate: 0.1   # Randomly shift the canvas
+  scale: 0.5       # Randomly zoom in/out
+  shear: 0.0       # Already handled by your generator
+  perspective: 0.0 # Already handled by your generator
+  flipud: 0.0      # Paintings are rarely upside down
+  fliplr: 0.5      # Horizontal flips are okay
+  mosaic: 1.0      # Combine 4 synthetic images into one batch (highly recommended)
+  mixup: 0.1       # Blend two images for better generalization
