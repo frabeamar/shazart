@@ -23,9 +23,7 @@ COPY pyproject.toml .
 # We use pip to install the requirements directly from the pyproject.toml
 RUN pip install --no-cache-dir .
 
-# Copy the rest of the application code
-COPY . .
-
+COPY *.py .
 # Expose the port Streamlit runs on
 EXPOSE 8501
 
