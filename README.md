@@ -1,5 +1,6 @@
 # Shazart
-Ever stared at a masterpiece in a museum and thought, "It’s pretty, but I can't bother to read the tedious description?" Shazart is the Shazam for the art world—with a personality. Search a title, and we’ll skip the dry, crusty textbook jargon. Instead, you get a punchy, fun retelling of the scandals, the secrets, and the "what was the artist thinking?" behind the canvas.
+Ever stared at a masterpiece in a museum and thought, "It’s pretty, but I can't bother to read the tedious description?" Shazart is the Shazam for the art world—with a personality. Search by title or by an image, and we’ll skip the dry, crusty textbook jargon. Instead, you get a punchy, fun retelling of the scandals, the secrets, and the "what was the artist thinking?" behind the canvas.
+Ask question about the collection. The RAG augmented system will be able to answer your questions!
 
 # How to run 
 Download the entire collection of the Rijkmuseum with the public API running 
