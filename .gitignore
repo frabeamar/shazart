@@ -3,7 +3,8 @@ rijks_images/
 images/
 labels/
 runs/
-
+.env
+*.db
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
