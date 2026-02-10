@@ -9,7 +9,11 @@ dependencies = [
     "numpy",
     "streamlit",
     "cohere",
+    "scikit-image", 
     "google-genai",
     "python-dotenv",
-    "pymilvus[milvus_lite]"
+    "pymilvus[milvus_lite]",
+    "kornia-rs",
+    "opencv-contrib-python", 
+    "ultralytics"
 ]

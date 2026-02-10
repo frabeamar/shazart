@@ -1,4 +1,3 @@
-from hmac import new
 import os
 from pathlib import Path
 
@@ -8,13 +7,11 @@ import streamlit as st
 import tqdm
 
 # load dotenv
-from dotenv import load_dotenv
 from google import genai
 from PIL import Image
 
 from data import base64_from_image, compute_image_embedding
 
-load_dotenv(".env")
 # --- Streamlit App Configuration ---
 st.set_page_config(layout="wide", page_title="Shazart: Vision RAG at the Rijksmuseum")
 st.title("Shazart: Vision RAG at the Rijksmuseum 🖼️")
@@ -27,11 +24,16 @@ st.text(intro)
 # --- API Key Input ---
 with st.sidebar:
     st.header("🔑 API Keys")
+
     cohere_api_key = st.text_input("Cohere API Key", type="password", key="cohere_key")
     google_api_key = st.text_input(
         "Google API Key (Gemini)", type="password", key="google_key"
     )
+    if "COHERE_API_KEY" in os.environ:
+        cohere_api_key = os.environ["COHERE_API_KEY"]
 
+    if "GOOGLE_API_KEY" in os.environ:
+        google_api_key = os.environ["GOOGLE_API_KEY"]
 
     "[Get a Cohere API key](https://dashboard.cohere.com/api-keys)"
     "[Get a Google API key](https://aistudio.google.com/app/apikey)"
@@ -86,7 +88,11 @@ with st.expander("ℹ️ About the models used"):
     
     Gemini 2.5 Flash is Google's efficient multimodal model that can process text and image inputs to generate high-quality responses.
     It's designed for fast inference while maintaining high accuracy, making it ideal for real-time applications like this RAG system.
-    """)
+    
+    ### YOLO 8n
+        Is trained from scratch. It's training data are painting from the museum after applying an homography and added to colored background
+                
+                """)
 
 # --- Helper functions ---
 # Some helper functions to resize images and to convert them to base64 format
@@ -204,7 +210,6 @@ def search(
         return None
 
 
-
 def validate(img_path: str, gemini_client) -> list:
     missing = []
     if not gemini_client or not img_path or not os.path.exists(img_path):
@@ -247,6 +252,7 @@ Please provide enough context for your answer.
 Question: {question}"""
     return call_with_prompt(prompt, img_path, gemini_client)
 
+
 def funny_summary(img_path: str, gemini_client):
     missing = validate(img_path, gemini_client)
     if missing:
@@ -260,7 +266,6 @@ def funny_summary(img_path: str, gemini_client):
     [Artist llife events which are relevant to the painting ]
     """
     return call_with_prompt(prompt, img_path, gemini_client)
-
 
 
 # --- Main UI Setup ---
@@ -296,14 +301,9 @@ if cohere_api_key and co:
                     )
                 st.success(f"Loaded {len(new_paths)} sample images.")
 
-                with st.spinner("Generating caption..."):
-                    for image in new_paths:
-                        caption_text = funny_summary(image, genai_client)
-                        st.markdown(f"**The better museum caption:**\n{caption_text}")
-    
             else:
                 st.info("Sample images already loaded.")
-                
+
         else:
             st.error("Failed to load sample images. Check console for errors.")
 else:
@@ -387,17 +387,87 @@ if uploaded_files and co:
             st.success(
                 f"Successfully processed and added {len(newly_uploaded_paths)} new images."
             )
-            for image in newly_uploaded_paths:
-                with st.spinner("Generating caption..."):
-                    caption_text = funny_summary(image, genai_client)
-                    st.markdown(f"**The better museum caption:**\n{caption_text}")
         else:
             st.warning("Failed to generate embeddings for newly uploaded images.")
     elif uploaded_files:  # If files were selected but none were new
         st.info("Selected images already seem to be processed.")
 
-# --- Vision RAG Section (Main UI) ---
+
+## DISPLAY IMAGES
+
+
+st.subheader(" IMAGES ")
+
+
+with st.container(border=True):
+    if st.session_state.image_paths:
+        num_images_to_show = len(st.session_state.image_paths)
+        cols = st.columns(5)  # Show 5 thumbnails per row
+        for i in range(num_images_to_show):
+            with cols[i % 5]:
+                # Add try-except for missing files during display
+                try:
+                    st.image(
+                        st.session_state.image_paths[i],
+                        width=100,
+                        caption=os.path.basename(st.session_state.image_paths[i]),
+                    )
+                except FileNotFoundError:
+                    st.error(
+                        f"Missing: {os.path.basename(st.session_state.image_paths[i])}"
+                    )
+    else:
+        st.write("No images loaded yet.")
+
+
 st.markdown("---")
+# st.subheader("Detecting paintings with YOLO ")
+
+# # 1. Load your custom trained OBB model
+# model = YOLO("runs/obb/train/weights/best.pt")
+
+# with st.container(border=True):
+#     if st.session_state.image_paths:
+#         num_images_to_show = len(st.session_state.image_paths)
+#         cols = st.columns(5)  # Show 5 thumbnails per row
+#         for i in range(num_images_to_show):
+#             with cols[i % 5]:
+#                 # Add try-except for missing files during display
+#                 try:
+#                     result = model.predict(source=st.session_state.image_paths[i], conf=0.8 )
+#                     x, y, xx, yy = (
+#                         result[0].obb.xyxy.cpu().numpy().astype(np.int32)[0].clip(0)
+#                     )
+#                     breakpoint()
+#                     skimage.io.imsave( "temp.jpg",result[0].orig_img[x:xx, y:yy][:, :, ::-1],      )
+#                     st.image(
+#                         "temp.jpg",
+#                         width=result[0].orig_img.shape[0],
+#                     )
+#                 except FileNotFoundError:
+#                     st.error("Missing file")
+
+
+button = st.button(
+    "Generate caption",
+    key="generate caption",
+    disabled=not (
+        cohere_api_key
+        and google_api_key
+        and st.session_state.image_paths
+        and st.session_state.doc_embeddings is not None
+        and st.session_state.doc_embeddings.size > 0
+    ),
+)
+if button:
+    with st.spinner("Generating caption..."):
+        for image in st.session_state.image_paths:
+            caption_text = funny_summary(image, genai_client)
+            st.markdown(f"**The better museum caption:**\n{caption_text}")
+
+# --- Vision RAG Section (Main UI) ---
+
+
 st.subheader("❓ Ask a Question")
 
 if not st.session_state.image_paths:
@@ -407,33 +477,11 @@ else:
         f"Ready to answer questions about {len(st.session_state.image_paths)} images. The rijkmuseum collection is also included!"
     )
 
-                    
-
-    # Display thumbnails of all loaded images (optional)
-    with st.expander("View Loaded Images", expanded=False):
-        if st.session_state.image_paths:
-            num_images_to_show = len(st.session_state.image_paths)
-            cols = st.columns(5)  # Show 5 thumbnails per row
-            for i in range(num_images_to_show):
-                with cols[i % 5]:
-                    # Add try-except for missing files during display
-                    try:
-                        st.image(
-                            st.session_state.image_paths[i],
-                            width=100,
-                            caption=os.path.basename(st.session_state.image_paths[i]),
-                        )
-                    except FileNotFoundError:
-                        st.error(
-                            f"Missing: {os.path.basename(st.session_state.image_paths[i])}"
-                        )
-        else:
-            st.write("No images loaded yet.")
 
 question = st.text_input(
     "Ask a question about the loaded images:",
     key="main_question_input",
-    placeholder="what is the name and the author of the painting ?",
+    placeholder="which painting depicts van gogh?",
     disabled=not st.session_state.image_paths,
 )
 
@@ -482,11 +530,10 @@ if run_button:
 
                 if top_image_path:
                     caption = f"Retrieved content for: '{question}' (Source: {os.path.basename(top_image_path)})"
- 
+
                     retrieved_image_placeholder.image(
                         top_image_path, caption=caption, use_container_width=True
                     )
-
 
                     with st.spinner("Generating answer..."):
                         final_answer = answer(question, top_image_path, genai_client)

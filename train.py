@@ -110,15 +110,16 @@ class ImageGenerator:
         return " ".join(map(str, label_line)) + "\n"
 
 
+def generate_data():
+    gen = ImageGenerator.from_folder(Path.home()/ "data/como_lake", Path("rijks_images"))
+    gen.generate_dataset(1000, "train")
+    gen.generate_dataset(200, "val")
 
 
 def train():
     # 1. Initialize the model (YOLOv8 or YOLOv11 OBB)
     shutil.rmtree("runs", ignore_errors=True )
     model = YOLO("yolov8n-obb.pt")
-    gen = ImageGenerator.from_folder(Path.home()/ "data/como_lake", Path("rijks_images"))
-    gen.generate_dataset(1000, "train")
-    gen.generate_dataset(200, "val")
 
 
     # 2. Overwrite the trainer with our custom generator trainer
