@@ -307,7 +307,7 @@ if cohere_api_key and co:
         else:
             st.error("Failed to load sample images. Check console for errors.")
 else:
-    st.warning("Enter API keys to enable loading sample images.")
+    st.warning("Enter API keys before proceeding.")
 
 st.markdown("--- ")
 # --- File Uploader (Main UI) ---

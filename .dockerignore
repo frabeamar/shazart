@@ -1,0 +1,7 @@
+# Step 1: Ignore everything
+*
+
+# Step 2: Explicitly allow only what you need
+!app.py
+!pyproject.toml
+!Dockerfile

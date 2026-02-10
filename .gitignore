@@ -1,5 +1,8 @@
 #project specific folders
 rijks_images/
+images/
+labels/
+runs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
