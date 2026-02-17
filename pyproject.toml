@@ -15,5 +15,6 @@ dependencies = [
     "pymilvus[milvus_lite]",
     "kornia-rs",
     "opencv-contrib-python", 
+    "scikit-learn",
     "ultralytics"
 ]

@@ -1,46 +1,70 @@
-import random
+import os
+import multiprocessing as mp
 import shutil
+import sklearn
 from dataclasses import dataclass
 from pathlib import Path
-
+import sklearn.model_selection
+import yaml
 import cv2
 import numpy as np
 import tqdm
 from ultralytics import YOLO
+
+from data import IMAGES
+
+TRAIN_DATA = Path("data/train")
+VAL_DATA = Path("data/val")
+
+
 
 
 @dataclass
 class ImageGenerator:
     fg_images: list[Path]
     bg_images: list[Path]
-    
+
     @classmethod
-    def from_folder(cls, bg_folder: Path, fg_folder:Path):
-        bg_images = list(bg_folder.glob("*.jpg")) 
+    def from_folder(cls, bg_folder: Path, fg_folder: Path):
+        bg_images = list(bg_folder.glob("*.jpg"))
         fg_images = list(fg_folder.glob("*.jpg"))
         return ImageGenerator(fg_images=fg_images, bg_images=bg_images)
 
-    def generate_dataset(self, n:int, data_type:str):
-        shutil.rmtree("images", ignore_errors=True )
-        shutil.rmtree("labels", ignore_errors=True )
+    def generate_dataset(self, image_list: list[Path], dest_folder: Path):
+        images = Path(dest_folder / "images")
+        images.mkdir(exist_ok=True, parents=True)
 
-        
-        Path(f"images/{data_type}").mkdir(exist_ok=True, parents=True)
-        Path(f"labels/{data_type}").mkdir(exist_ok=True, parents=True)
-        iters = range(min(len(self.fg_images), n))
-        for i in tqdm.tqdm(iters, desc=f"generating {data_type} data"):
-            r = np.random.randint(0, len(self.bg_images)-1)
-            data = self.generate_homography(self.fg_images[i], self.bg_images[r])
-            if data:
-                img, gt_data = data
-                cv2.imwrite(f"images/{data_type}/{gt_data['img_id']}.jpg", img)
-
-                with open(f"labels/{data_type}/{gt_data['img_id']}.txt", "w") as f:
-                    labels = self.yolo_label(gt_data)
-                    f.write(labels)
+        labels = Path(dest_folder / "labels")
+        labels.mkdir(exist_ok=True, parents=True)
 
 
-    def generate_homography(self, painting_path:Path, background_path:Path):
+        r = lambda: np.random.randint(0, len(self.bg_images) - 1)
+        N = len(image_list)
+        random_bgs = [self.bg_images[r()] for _ in range(N)]
+
+        with mp.Pool(
+            os.cpu_count(),
+        ) as pool:
+            data = list(zip(image_list, random_bgs))
+            size = 100
+            for chunk in tqdm.tqdm(
+                np.split(data, np.arange(size, len(data), size)),
+                desc="Generating data",
+                total=len(data) // size + 1,
+            ):
+                outputs = pool.starmap(self.generate_homography, chunk)
+
+                for data in outputs:
+                    if data:
+                        img, gt_data = data
+                        cv2.imwrite(str(images / f"{gt_data['img_id']}.jpg"), img)
+
+                        with open(str(labels / f"{gt_data['img_id']}.txt"), "w") as f:
+                            f.write(self.yolo_label(gt_data))
+
+    def generate_homography(
+        self, painting_path: Path, background_path: Path
+    ) -> tuple[np.ndarray, dict]:
         # 1. Load the painting
         painting = cv2.imread(str(painting_path))
         bg = cv2.imread(str(background_path))
@@ -52,23 +76,22 @@ class ImageGenerator:
         bg_h, bg_w, _ = bg.shape
         # Optional: Add some random noise to the background
         noise = np.random.randint(0, 30, (bg_h, bg_w, 3), dtype=np.int16)
+        x1, x2, x3, x4 = np.random.normal(0, bg_w // 20, 4)
+        y1, y2, y3, y4 = np.random.normal(0, bg_h // 20, 4)
         bg = np.clip(bg.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
         # 3. Define corners for Homography
         src_coords = np.float32([[0, 0], [w_p, 0], [w_p, h_p], [0, h_p]])
 
         # Generate distorted destination points
-        margin = 100
-        dst_coords = np.float32(
+        dst_coords = np.array(
             [
-                [random.uniform(margin, bg_w / 2), random.uniform(margin, bg_h / 2)],
-                [random.uniform(bg_w / 2, bg_w - margin), random.uniform(margin, bg_h / 2)],
-                [
-                    random.uniform(bg_w / 2, bg_w - margin),
-                    random.uniform(bg_h / 2, bg_h - margin),
-                ],
-                [random.uniform(margin, bg_w / 2), random.uniform(bg_h / 2, bg_h - margin)],
-            ]
+                [bg_w // 4 + x1, bg_h // 4 + y1],
+                [bg_w - bg_w // 4 + x2, bg_h // 4 + y2],
+                [bg_w - bg_w // 4 + x3, bg_h - bg_h // 4 + y3],
+                [bg_w // 4 + x4, bg_h - bg_h // 4 + y4],
+            ],
+            dtype=np.float32,
         )
 
         # 4. Homography Warp
@@ -90,7 +113,6 @@ class ImageGenerator:
         }
         return bg, gt_data
 
-
     def yolo_label(self, gt_data, class_id=0):
         # 1. Setup paths
         w = gt_data["dimensions"]["width"]
@@ -110,35 +132,71 @@ class ImageGenerator:
         return " ".join(map(str, label_line)) + "\n"
 
 
-def generate_data():
-    gen = ImageGenerator.from_folder(Path.home()/ "data/como_lake", Path("rijks_images"))
-    gen.generate_dataset(1000, "train")
-    gen.generate_dataset(200, "val")
+def generate_data(delete_existing:bool = False):
+    if delete_existing:
+        if TRAIN_DATA.exists():
+            shutil.rmtree(TRAIN_DATA)
+        TRAIN_DATA.mkdir(exist_ok=True, parents=True)
+
+        if VAL_DATA.exists():
+            shutil.rmtree(VAL_DATA)
+        VAL_DATA.mkdir(exist_ok=True, parents=True)
+
+
+    gen = ImageGenerator.from_folder(
+        bg_folder=Path.home() / "data/como_lake", fg_folder=IMAGES
+    )
+    Path("test").mkdir(exist_ok=True, parents=True)
+    train, test = sklearn.model_selection.train_test_split(gen.fg_images, test_size=0.1, random_state=42)
+    gen.generate_dataset(train, TRAIN_DATA)
+    gen.generate_dataset(test, VAL_DATA)
+
+
+def generate_yolo_yaml(yaml_path: Path):
+    """
+    Generates a YOLO data configuration YAML file.
+    """
+    # 1. Prepare the data structure
+    data = {
+        # 'path': TRAIN_DATA.parent.as_posix(), # Dataset root
+        'train': TRAIN_DATA.resolve().as_posix(),
+        'val': VAL_DATA.resolve().as_posix(),
+        'nc': 1, # Number of classes
+        'names': ["painting"]  # List of class names
+    }
+    
+    # 2. Write to YAML file
+    with open(yaml_path, 'w') as f:
+        # sort_keys=False preserves the order of your dictionary
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+    
+
 
 
 def train():
-    # 1. Initialize the model (YOLOv8 or YOLOv11 OBB)
-    shutil.rmtree("runs", ignore_errors=True )
+    shutil.rmtree("runs", ignore_errors=True)
     model = YOLO("yolov8n-obb.pt")
-
-
-    # 2. Overwrite the trainer with our custom generator trainer
-    # We use the 'train' method but pass our custom class via the 'trainer' argument
+    generate_yolo_yaml(Path("cfg.yaml"))
     model.train(
-        data="cfg.yaml",  # Still needed for class names/paths
-        epochs=4,
+        data="cfg.yaml", 
+        epochs=5,
         imgsz=640,
         batch=32,
         device=0,  # Use 'cpu' if no GPU available
     )
+    Path("yolo").mkdir(exist_ok=True, parents=True)
+    shutil.copy("runs/obb/train/weights/best.pt", "yolo/model.pt")
+    
 
 
 def inference():
     # 1. Load your custom trained OBB model
-    model = YOLO("runs/obb/train/weights/best.pt")
+    model = YOLO("yolo/model.pt")
 
     # 2. Run inference on a test image
-    results = model.predict(source="earring.jpg", save=True, conf=0.8)
+    model.predict(source="test_images/earring.jpg", save=True, conf=0.8)
 
 
+generate_data(delete_existing=True)
 train()
+inference()
